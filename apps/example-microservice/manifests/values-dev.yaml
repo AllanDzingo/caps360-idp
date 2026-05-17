@@ -1,0 +1,20 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/my-org/example-microservice
+  tag: latest # Overridden by CI/CD
+
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: dev.api.caps360.co.za
+      paths:
+        - path: /
+          pathType: Prefix
+
+env:
+  - name: APP_ENV
+    value: "development"
+  - name: PORT
+    value: "8080"

@@ -1,0 +1,12 @@
+loki:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 10Gi
+  config:
+    auth_enabled: false
+
+promtail:
+  enabled: true
+  config:
+    lokiAddress: http://loki-stack:3100/loki/api/v1/push

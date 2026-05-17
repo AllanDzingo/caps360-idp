@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backstage
+  labels:
+    app: backstage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backstage
+  template:
+    metadata:
+      labels:
+        app: backstage
+    spec:
+      containers:
+        - name: backstage
+          # Using a generic pre-built image as requested
+          image: ghcr.io/backstage/backstage:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7007
+          env:
+            - name: APP_CONFIG_app_baseUrl
+              value: https://backstage.caps360.co.za
+            - name: APP_CONFIG_backend_baseUrl
+              value: https://backstage.caps360.co.za
+            - name: APP_CONFIG_backend_listen_port
+              value: "7007"
+          # In a real environment, you would also mount ConfigMaps/Secrets for DB, GitHub Tokens, etc.

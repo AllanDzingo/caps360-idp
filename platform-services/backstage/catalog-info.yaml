@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: caps360-idp
+  description: The Internal Developer Platform
+  annotations:
+    github.com/project-slug: my-org/caps360-idp
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
