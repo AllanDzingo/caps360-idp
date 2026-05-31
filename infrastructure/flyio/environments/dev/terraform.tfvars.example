@@ -1,0 +1,17 @@
+# Development Environment
+# Copy this file to terraform.tfvars and fill in the values
+
+fly_api_token = "your-fly-api-token-here"
+docker_image  = "ghcr.io/your-org/caps-idp/example-microservice:latest"
+region        = "iad"
+machine_count = 1
+cpu           = 1
+memory_mb     = 256
+domain        = null  # Set to "dev.example.com" if you have a custom domain
+
+app_secrets = {
+  # DATABASE_URL = "postgres://..."
+  # API_KEY = "..."
+}
+
+create_volume = false

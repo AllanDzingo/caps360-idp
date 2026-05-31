@@ -1,0 +1,50 @@
+app = "caps-idp-example-staging"
+primary_region = "iad"
+
+[env]
+  APP_ENV = "staging"
+  PORT = "8080"
+
+[build]
+  builder = "paketobuildpacks"
+
+[env.build]
+  NIXPACKS_PKGS = "go"
+
+[http_service]
+  internal_port = 8080
+  processes = ["app"]
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 8080
+  auto_start_machines = true
+  auto_stop_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = false
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [services.http_checks]
+    enabled = true
+    interval = 30000
+    timeout = 5000
+    grace_period = "5s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+[[processes]]
+  name = "app"
+  cmd = ["./main"]

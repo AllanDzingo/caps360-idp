@@ -1,0 +1,145 @@
+name: Deploy to Fly.io
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - develop
+    paths:
+      - 'apps/example-microservice/**'
+      - '.github/workflows/deploy-flyio.yaml'
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLY_REGISTRY_HOST: registry.fly.io
+  FLY_ORG: personal
+
+jobs:
+  deploy:
+    name: Deploy to Fly.io
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine environment
+        id: environment
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "env=production" >> $GITHUB_OUTPUT
+            echo "fly_app=caps-idp-example-prod" >> $GITHUB_OUTPUT
+            echo "fly_config=apps/example-microservice/fly.toml.prod" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "env=staging" >> $GITHUB_OUTPUT
+            echo "fly_app=caps-idp-example-staging" >> $GITHUB_OUTPUT
+            echo "fly_config=apps/example-microservice/fly.toml.staging" >> $GITHUB_OUTPUT
+          else
+            echo "env=development" >> $GITHUB_OUTPUT
+            echo "fly_app=caps-idp-example-dev" >> $GITHUB_OUTPUT
+            echo "fly_config=apps/example-microservice/fly.toml.dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly.io
+        working-directory: apps/example-microservice
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          # Copy the environment-specific fly.toml
+          cp ${{ steps.environment.outputs.fly_config }} fly.toml
+          
+          # Deploy
+          flyctl deploy --remote-only
+
+      - name: Deployment Info
+        if: success()
+        run: |
+          echo "✅ Deployment successful!"
+          echo "Environment: ${{ steps.environment.outputs.env }}"
+          echo "App: ${{ steps.environment.outputs.fly_app }}"
+          echo "App URL: https://${{ steps.environment.outputs.fly_app }}.fly.dev"
+
+      - name: Notify deployment failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK" ]; then
+            curl -X POST "$SLACK_WEBHOOK" \
+              -H 'Content-Type: application/json' \
+              -d "{
+                \"text\": \"❌ Fly.io deployment failed\",
+                \"attachments\": [{
+                  \"color\": \"danger\",
+                  \"fields\": [
+                    {\"title\": \"Repository\", \"value\": \"${{ github.repository }}\", \"short\": true},
+                    {\"title\": \"Branch\", \"value\": \"${{ github.ref_name }}\", \"short\": true},
+                    {\"title\": \"Commit\", \"value\": \"${{ github.sha }}\", \"short\": true},
+                    {\"title\": \"Environment\", \"value\": \"${{ steps.environment.outputs.env }}\", \"short\": true}
+                  ]
+                }]
+              }"
+          fi
+
+  test:
+    name: Test Deployment
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine environment
+        id: environment
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "fly_app=caps-idp-example-prod" >> $GITHUB_OUTPUT
+            echo "url=https://caps-idp-example-prod.fly.dev" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "fly_app=caps-idp-example-staging" >> $GITHUB_OUTPUT
+            echo "url=https://caps-idp-example-staging.fly.dev" >> $GITHUB_OUTPUT
+          else
+            echo "fly_app=caps-idp-example-dev" >> $GITHUB_OUTPUT
+            echo "url=https://caps-idp-example-dev.fly.dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wait for deployment
+        run: sleep 10
+
+      - name: Health check
+        run: |
+          for i in {1..30}; do
+            if curl -sf ${{ steps.environment.outputs.url }}/health; then
+              echo "✅ Health check passed"
+              exit 0
+            fi
+            echo "⏳ Waiting for deployment to be ready... (attempt $i/30)"
+            sleep 5
+          done
+          echo "❌ Health check failed"
+          exit 1
+
+      - name: Smoke test
+        run: |
+          response=$(curl -s ${{ steps.environment.outputs.url }})
+          if echo "$response" | grep -q "Hello from the caps360 IDP Example Microservice"; then
+            echo "✅ Smoke test passed"
+            echo "Response: $response"
+          else
+            echo "❌ Smoke test failed"
+            echo "Response: $response"
+            exit 1
+          fi

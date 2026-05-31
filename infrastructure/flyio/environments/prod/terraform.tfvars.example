@@ -1,0 +1,10 @@
+fly_api_token = "your-fly-api-token-here"
+docker_image  = "ghcr.io/your-org/caps-idp/example-microservice:latest"
+region        = "iad"
+machine_count = 3
+cpu           = 2
+memory_mb     = 1024
+domain        = "example.com"  # Set your production domain
+
+app_secrets = {}
+create_volume = true
